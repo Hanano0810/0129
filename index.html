@@ -222,12 +222,10 @@
             <p class="works-role">${esc(w.role)}</p>
             <h2 class="works-label">制作物</h2>
             <div class="work-list">${cards}</div>
-            <button class="know-btn to-profile" type="button">${esc(SITE.profile.title)}</button>
           </div>
         </section>`, "is-cover");
       app.querySelector(".back-btn").addEventListener("click", renderLetter);
       app.querySelector("[data-profile]")?.addEventListener("click", renderProfile);
-      app.querySelector(".to-profile").addEventListener("click", renderProfile);
     }
 
     /* ⑥ プロフィール（Figma「やしまかつき」の自己紹介サイト） */

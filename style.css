@@ -271,7 +271,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .know-btn::after { content: " →"; }
 .know-btn:active { opacity: 0.8; }
-.to-profile { display: block; width: 100%; margin-top: 32px; }
 
 /* ---------- ⑤ 担当・制作物 ---------- */
 .works {
