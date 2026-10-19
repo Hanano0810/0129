@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>かつき</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app"></main>
+
+  <script src="messages.js"></script>
+  <script>
+    const app = document.getElementById("app");
+    const root = document.documentElement;
+    root.style.setProperty("--main", SITE.color);
+    root.style.setProperty("--cover-bg", SITE.bg);
+    document.title = SITE.name;
+
+    function esc(text) {
+      return String(text).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+
+    // 写真が未設定（またはファイルが見つからない）なら灰色の枠を出す
+    function photo(src, cls, label = "写真") {
+      const ph = `<div class="${cls} ph">${label}</div>`;
+      return src
+        ? `<img class="${cls}" src="${esc(src)}" alt="" onerror="this.outerHTML=this.dataset.ph" data-ph="${esc(ph)}">`
+        : ph;
+    }
+
+    // ひょうたんのロゴ（Figma のロゴをまねた絵）
+    function gourd(text) {
+      return `
+        <svg class="gourd" viewBox="0 0 60 80" aria-hidden="true">
+          <path d="M30 6c-3 0-4 2-4 4v4c-6 2-9 6-9 11 0 4 2 7 5 9-9 4-14 11-14 20 0 13 10 22 22 22s22-9 22-22c0-9-5-16-14-20 3-2 5-5 5-9 0-5-3-9-9-11v-4c0-2-1-4-4-4z" fill="#e2b04a" stroke="#7a5a1c" stroke-width="1.5"/>
+          <path d="M20 33c6 3 14 3 20 0" fill="none" stroke="#c0262d" stroke-width="3" stroke-linecap="round"/>
+          <path d="M38 34c2 6 4 12 8 16M40 34c4 5 8 8 12 10" fill="none" stroke="#c0262d" stroke-width="2.5" stroke-linecap="round"/>
+          <text x="30" y="27" text-anchor="middle" font-size="12" font-weight="700" fill="#111">${esc(text[0] || "")}</text>
+          <text x="30" y="60" text-anchor="middle" font-size="17" font-weight="700" fill="#111">${esc(text[1] || "")}</text>
+        </svg>`;
+    }
+
+    function show(html, screenClass) {
+      app.className = screenClass;
+      app.innerHTML = html;
+      window.scrollTo(0, 0);
+    }
+
+    const envelopeHtml = `
+      <div class="env">
+        <div class="env-back"></div>
+        <div class="env-paper"></div>
+        <div class="env-front"></div>
+        <div class="env-flap"></div>
+        <div class="env-seal"></div>
+      </div>`;
+
+    /* ① 最初の画面：手紙をタップ */
+    function renderCover() {
+      show(`
+        <section class="screen cover">
+          <p class="cover-text">${esc(SITE.name)}さんに<br>メッセージが届いています</p>
+          <button class="env-btn" type="button" aria-label="手紙をひらく">
+            <span class="ripple" aria-hidden="true"></span>
+            ${envelopeHtml}
+          </button>
+          <p class="tap-hint" aria-hidden="true">
+            <svg class="finger" viewBox="0 0 24 24" width="28" height="28"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.7-2.3L4.4 15.6a1.5 1.5 0 0 1 2.3-1.9L9 16" fill="#f3f3f1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>手紙をタップしてね</span>
+          </p>
+        </section>`, "is-cover");
+      app.querySelector(".env-btn").addEventListener("click", renderGame);
+    }
+
+    /* ② ミニゲーム：スライドパズル（空いているマスにピースをすべらせて絵を完成させる） */
+    function renderGame() {
+      const g = SITE.game;
+      const n = g.size;
+      const last = n * n - 1;            // 右下のピースを抜いて空きマスにする
+      let board = [...Array(n * n).keys()]; // board[マス] = ピース番号（last が空き）
+      let moves = 0, done = false;
+
+      // そろった状態からランダムに動かしてまぜる（必ず解ける）
+      let empty = last, prev = -1;
+      for (let k = 0; k < g.shuffle || board.every((p, i) => p === i); k++) {
+        const next = neighbors(empty).filter((i) => i !== prev);
+        const pick = next[Math.floor(Math.random() * next.length)];
+        [board[empty], board[pick]] = [board[pick], board[empty]];
+        prev = empty;
+        empty = pick;
+      }
+
+      function neighbors(i) {
+        const r = Math.floor(i / n), c = i % n, list = [];
+        if (r > 0) list.push(i - n);
+        if (r < n - 1) list.push(i + n);
+        if (c > 0) list.push(i - 1);
+        if (c < n - 1) list.push(i + 1);
+        return list;
+      }
+
+      // 写真があれば写真を切り分け、なければ番号のピース
+      const pieceFace = (p) => g.image
+        ? `style="background-image:url('${esc(g.image)}');background-position:${(p % n) / (n - 1) * 100}% ${Math.floor(p / n) / (n - 1) * 100}%;background-size:${n * 100}%"`
+        : "";
+      const pieces = [...Array(n * n).keys()].map((p) => `
+        <button class="pz${g.image ? " has-img" : ""}${p === last ? " pz-last" : ""}" type="button" data-p="${p}" ${pieceFace(p)} aria-label="ピース ${p + 1}">
+          ${g.image ? "" : `<span>${p + 1}</span>`}
+        </button>`).join("");
+
+      show(`
+        <section class="screen cover">
+          <div class="game-card">
+            <p class="game-head">GAME</p>
+            <p class="game-title">${esc(g.title)}</p>
+            <p class="game-hud">
+              <span>正しい位置 <b class="ok">0</b> / ${last}</span>
+              <span>動かした回数 <b class="turns">0</b></span>
+            </p>
+            <div class="puzzle" style="--n:${n}">${pieces}</div>
+            <p class="game-msg" aria-live="polite"></p>
+            <p class="game-tip">空いているマスのとなりのピースをタップしてね</p>
+          </div>
+        </section>`, "is-cover");
+
+      const els = [...app.querySelectorAll(".pz")];
+      const okEl = app.querySelector(".ok");
+      const turnsEl = app.querySelector(".turns");
+      const msg = app.querySelector(".game-msg");
+
+      function bump(el, v) {
+        if (el.textContent === String(v)) return;
+        el.textContent = v;
+        el.classList.remove("bump");
+        void el.offsetWidth;
+        el.classList.add("bump");
+      }
+
+      function place() {
+        board.forEach((p, i) => {
+          const el = els[p];
+          el.style.setProperty("--x", i % n);
+          el.style.setProperty("--y", Math.floor(i / n));
+          el.classList.toggle("is-ok", p === i && p !== last);
+        });
+        bump(okEl, board.filter((p, i) => p === i && p !== last).length);
+      }
+      place();
+
+      els.forEach((el) => el.addEventListener("click", () => {
+        if (done) return;
+        const from = board.indexOf(Number(el.dataset.p));
+        const to = board.indexOf(last);
+        if (!neighbors(to).includes(from)) {
+          el.classList.remove("nope");
+          void el.offsetWidth;
+          el.classList.add("nope");
+          return;
+        }
+        [board[from], board[to]] = [board[to], board[from]];
+        bump(turnsEl, ++moves);
+        place();
+        if (board.every((p, i) => p === i)) {
+          done = true;
+          app.querySelector(".puzzle").classList.add("solved");
+          msg.className = "game-msg big";
+          msg.textContent = "CLEAR!";
+          setTimeout(renderOpening, 1800);
+        }
+      }));
+    }
+
+    /* ③ 手紙がひらくアニメーション */
+    function renderOpening() {
+      show(`<section class="screen cover"><div class="opening">${envelopeHtml}</div></section>`, "is-cover");
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        app.querySelector(".opening").classList.add("open")));
+      setTimeout(renderLetter, 1900);
+    }
+
+    /* ④ 手紙 */
+    function renderLetter() {
+      const l = SITE.letter;
+      show(`
+        <section class="screen cover">
+          <article class="paper">
+            <p class="paper-to">${esc(l.to)}</p>
+            <div class="paper-body">${esc(l.body)}</div>
+            <p class="paper-from">${esc(l.from)}</p>
+            <button class="know-btn" type="button">${esc(SITE.team)}の${esc(SITE.name)}を知る</button>
+          </article>
+        </section>`, "is-cover");
+      app.querySelector(".know-btn").addEventListener("click", renderWorks);
+    }
+
+    /* ⑤ 担当・制作物 */
+    function renderWorks() {
+      const w = SITE.works;
+      const cards = w.items.map((item) => {
+        const inner = `${photo(item.image, "work-image", "スクリーンショット")}
+          <span class="work-title">${esc(item.title)}</span>`;
+        if (item.link === "profile") {
+          return `<button class="work" type="button" data-profile>${inner}</button>`;
+        }
+        if (item.link) {
+          return `<a class="work" href="${esc(item.link)}" target="_blank" rel="noopener">${inner}</a>`;
+        }
+        return `<div class="work">${inner}</div>`;
+      }).join("");
+
+      show(`
+        <section class="works">
+          <button class="back-btn" type="button">← 手紙にもどる</button>
+          <div class="works-inner">
+            <h2 class="works-label">担当</h2>
+            <p class="works-role">${esc(w.role)}</p>
+            <h2 class="works-label">制作物</h2>
+            <div class="work-list">${cards}</div>
+            <button class="know-btn to-profile" type="button">${esc(SITE.profile.title)}</button>
+          </div>
+        </section>`, "is-cover");
+      app.querySelector(".back-btn").addEventListener("click", renderLetter);
+      app.querySelector("[data-profile]")?.addEventListener("click", renderProfile);
+      app.querySelector(".to-profile").addEventListener("click", renderProfile);
+    }
+
+    /* ⑥ プロフィール（Figma「やしまかつき」の自己紹介サイト） */
+    function renderProfile() {
+      const p = SITE.profile;
+      const h = SITE.history;
+      const c = SITE.contact;
+      const rows = p.items.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+      const history = h.items.map(([date, text]) => `
+        <li class="${date.startsWith("令和") ? "reiwa" : ""}">
+          <span class="hist-date">${esc(date)}</span>
+          <span class="hist-text">${esc(text)}</span>
+        </li>`).join("");
+      const faq = c.faq.map(([q, a], i) => `
+        <dt>Q${i + 1}. ${esc(q)}</dt>
+        <dd>A．${esc(a)}</dd>`).join("");
+
+      show(`
+        <header class="top-bar">
+          <nav class="nav-left">
+            <a href="#know">${esc(p.title)}</a>
+            <a href="#history">${esc(h.title)}</a>
+          </nav>
+          <a href="#" class="logo to-top" aria-label="ページの上へ">${gourd(SITE.logo)}</a>
+          <nav class="nav-right">
+            <a href="#contact">${esc(c.title)}</a>
+          </nav>
+        </header>
+
+        <div class="hero-wrap">${photo(p.photo, "hero", "メイン写真")}</div>
+
+        <section id="know" class="sec">
+          <h2 class="sec-title">${esc(p.title)}</h2>
+          <div class="know">
+            <dl class="profile-table">${rows}</dl>
+            <div class="know-photos">
+              ${photo(p.subPhotos[0], "sub-photo", "写真")}
+              ${photo(p.subPhotos[1], "sub-photo round", "アイコン")}
+            </div>
+          </div>
+        </section>
+
+        <section id="history" class="sec">
+          <h2 class="sec-title">${esc(h.title)}</h2>
+          <ol class="history">${history}</ol>
+        </section>
+
+        <section id="contact" class="sec">
+          <h2 class="sec-title">${esc(c.title)}</h2>
+          <h3 class="sub-title">よくあるご質問</h3>
+          <dl class="faq">${faq}</dl>
+          <h3 class="sub-title">メールでのお問い合わせ</h3>
+          <p class="mail-note">以下のメールアドレスにて受け付けております</p>
+          <p class="mail">${esc(c.mail)}</p>
+        </section>
+
+        <footer class="foot">
+          <button class="back-btn" type="button">← 手紙にもどる</button>
+          <small>${esc(SITE.copyright)}</small>
+        </footer>`, "is-profile");
+
+      app.querySelector(".to-top").addEventListener("click", (e) => {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      app.querySelector(".back-btn").addEventListener("click", renderLetter);
+    }
+
+    renderCover();
+  </script>
+</body>
+</html>
